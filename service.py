@@ -20,14 +20,11 @@ infer = Inference()
 def infer_task(a):
     while a.running:
         time.sleep(0.1)
-        # print('infer tast wakening at ', time.time())
         if alg.pending:
+
             fid, task_id = a.target
-            # TODO: 执行下载文件操作 download file
-            file = fileApi.get(file_id=fid)
-            # TODO: 保存文件 save file
-            with open("tmp_file.jpg", 'wb') as f:
-                f.write(file.content)
+            # # TODO: 执行下载文件操作并存储在临时文件中
+            # fileApi.download(file_id=fid, 'tmp_file.jpg')
 
             img = Image.open("tmp_file.jpg")
             result = infer.infer(img)
@@ -42,26 +39,32 @@ def infer_task(a):
             os.remove(output_file_name+'.dat')
 
             # TODO: 上传结果文件，获取文件id
-            result = fileApi.upload(output_file_name+'.zip')
-            if result['code'] == 0:
-                output_fid = result['data']['fid']
-
-                # Todo: 更新算法任务状态 update task status
-                taskApi.update_task({
-                    'task_id': task_id,
-                    'status': 'done',
-                    'result': {
-                        'fid': output_fid,
-                        'count': 0 # 其他需要存储的字段
-                    }
-                })
-            else:
-                output_fid = None
-                taskApi.update_task({
-                    'task_id': task_id,
-                    'status': 'failed',
-                    'result': None
-                })
+            # result = fileApi.upload(output_file_name+'.zip')
+            # result = {
+            #     'code': 1,
+            # }
+            # output_fid = 'tmp_id' # TODO: remove on release
+            #
+            # if result['code'] == 0:
+            #     output_fid = result['data']['fid']
+            #
+            #
+            #     # Todo: 更新算法任务状态 update task status
+            #     taskApi.update_task({
+            #         'task_id': task_id,
+            #         'status': 'done',
+            #         'result': {
+            #             'fid': output_fid,
+            #             'count': 0 # 其他需要存储的字段
+            #         }
+            #     })
+            # else:
+            #     output_fid = None
+            #     taskApi.update_task({
+            #         'task_id': task_id,
+            #         'status': 'failed',
+            #         'result': None
+            #     })
 
             # 清空任务
             a.target = ()
@@ -118,11 +121,11 @@ def about():
 @app.route('/api/infer', methods=['POST'])
 def request_infer():
     print('infer request at ', time.time())
-    file_url = request.json.get('file_url')
+    file_id = request.json.get('file_id')
     task_id = request.json.get('task_id')
 
     # submit task
-    ret = alg.submit(file_url, task_id)
+    ret = alg.submit(file_id, task_id)
     print('infer request result', ret, ' at ', time.time())
 
     if ret == -1:
@@ -134,7 +137,7 @@ def request_infer():
         # return anyway
         return {
             'task_id': task_id,
-            'code': 'success'
+            'code': 'sbumitted'
         }
 
 
@@ -155,4 +158,4 @@ def test_infer():
         }
     }
 
-app.run(host='localhost', port=8008)
+app.run(host='0.0.0.0', port=8008)

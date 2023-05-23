@@ -1,0 +1,1 @@
+docker build -t issc/hir_dockwrap_demo:1.0 .
