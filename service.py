@@ -16,6 +16,13 @@ fileApi = FileApi('http://localhost:8000')
 taskApi = TaskApi('http://localhost:8000')
 
 
+# return code:
+# 'invalid': parameter invalid
+# 'busy': alg is running
+# 'submitted': alg submitted
+# 'failed': alg failed
+# 'done': alg done
+
 infer = Inference()
 def infer_task(a):
     while a.running:
@@ -25,9 +32,10 @@ def infer_task(a):
             fid, task_id = a.target
             # # TODO: 执行下载文件操作并存储在临时文件中
             # fileApi.download(file_id=fid, 'tmp_file.jpg')
-
             img = Image.open("tmp_file.jpg")
             result = infer.infer(img)
+
+            time.sleep(10)
 
             # generate result file
             output_file_name = 'output_{}'.format(task_id)
@@ -103,15 +111,17 @@ class Alg:
 alg = Alg()
 
 
+alg_type = 'alg_type'
 """
 算法信息
 """
 @app.route('/api/about', methods=['GET'])
 def about():
     return {
-        'alg_name': 'alg_name',
+        'name': 'alg_name',
+        'type': alg_type,
+        'version': '1.0',
         'description': 'description',
-        'version': '1.0'
     }
 
 
@@ -123,6 +133,22 @@ def request_infer():
     print('infer request at ', time.time())
     file_id = request.json.get('file_id')
     task_id = request.json.get('task_id')
+    data_time = request.json.get('data_time')
+    data_coord = request.json.get('data_coord')
+    task_type = request.json.get('task_type')
+
+    # data validation
+    if not (file_id and task_id and data_time and data_coord):
+        return {
+            'task_id': task_id,
+            'code': 'invalid',
+        }
+
+    if task_type != alg_type:
+        return {
+            'task_id': task_id,
+            'code': 'invalid',
+        }
 
     # submit task
     ret = alg.submit(file_id, task_id)
@@ -145,17 +171,17 @@ def request_infer():
 @app.route('/api/infer/demo', methods=['GET'])
 def test_infer():
     return {
-        'task_id': '0',
-        'file_url': 'http://localhost:8088/hir/crowd/count/demo.jpg',
-        'time': '2019-01-01 00:00:00',
+        'task_id': 'task_id',
+        'file_id': 'file_id',
+        'data_time': '2019-01-01 00:00:00',
         'submit_time': '2019-01-01 00:00:00',
         'finish_time': '2019-01-01 00:00:00',
-        'type': 'crowd_count',
+        'type': alg_type,
         'status': 'done',
         'result': {
             'count': 700,
-            'density_url': 'http://localhost:8088/hir/crowd/count/demo_result.zip'
+            'output_fid': 'output_fid'
         }
     }
 
-app.run(host='0.0.0.0', port=8008)
+app.run(host='0.0.0.0', port=10516)
