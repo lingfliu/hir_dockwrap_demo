@@ -37,10 +37,11 @@ class TaskApi:
         self.client.connect(host=self.ip, port=self.port, keepalive=45)
         return self.client
 
-    def update_task(self, task_id, result):
+    def update_task(self, task_id, status, result):
 
         params = {
             'task_id': task_id,
+            'status': status,
             'result': json.dumps(result)
         }
         f = json.dumps(params)

@@ -47,46 +47,20 @@ def infer_task(a):
             with open(output_file_name+'.dat', 'w') as f:
                 np.savetxt(f, result)
                 f.close()
+
+            """这里不做压缩"""
             # zf = zipfile.ZipFile(output_file_name+'.zip', 'w')
             # zf.write(output_file_name+'.dat', output_file_name+'.dat', zipfile.ZIP_DEFLATED)
             # zf.close()
             # os.remove(output_file_name+'.dat')
             response = fileApi.upload(output_file_name+'.dat')
             output_file_name = response['msg']['data']['new_name']
-            taskApi.update_task(task_id, {
-                'status': 'done',
+            taskApi.update_task(task_id, 'done', {
                 'output_file_name': output_file_name,
                 'result': {
                     'num': 10
                 }
             })
-
-
-            # result = {
-            #     'code': 1,
-            # }
-            # output_fid = 'tmp_id' # TODO: remove on release
-            #
-            # if result['code'] == 0:
-            #     output_fid = result['data']['fid']
-            #
-            #
-            #     # Todo: 更新算法任务状态 update task status
-            #     taskApi.update_task({
-            #         'task_id': task_id,
-            #         'status': 'done',
-            #         'result': {
-            #             'fid': output_fid,
-            #             'count': 0 # 其他需要存储的字段
-            #         }
-            #     })
-            # else:
-            #     output_fid = None
-            #     taskApi.update_task({
-            #         'task_id': task_id,
-            #         'status': 'failed',
-            #         'result': None
-            #     })
 
             # 清空任务
             a.target = ()
