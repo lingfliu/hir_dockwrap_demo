@@ -23,7 +23,29 @@ class BaseApi:
             print('err', response.status, 'on fetch', 'url')
             return {'result': 'err',
                     'msg': None}
+    def _download(self, url, file_name, saved_file_path):
 
+        res = urllib.request.urlretrieve(self.base_url + self.root_url + url+'/'+file_name, saved_file_path)
+        return res
+
+    def _upload_multipart(self, url, data, headers=None):
+
+        if headers is None:
+            headers = {}
+        headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 6.1; Win64; x64)'
+
+        with open(data['file'], 'rb') as f:
+            file_content = f.read()
+            f.close()
+            fields = {'file': (data['file'], file_content, 'multipart/form-data')}
+            response = http.request('POST', self.base_url + self.root_url + url, fields=fields, headers=headers)
+            if response.status == 200 and response.json():
+                return {'result': 'ok',
+                        'msg': json.loads(response.data)}
+            else:
+                print('err', response.status, 'on post', 'url')
+                return {'result': 'err',
+                        'msg': None}
     def _post_req(self, url, body, headers=None):
         if headers is None:
             headers = {}

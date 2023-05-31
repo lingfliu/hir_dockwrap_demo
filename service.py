@@ -9,12 +9,13 @@ from PIL import Image
 import numpy as np
 import zipfile
 import os
+import random
 
 app = Flask(__name__)
 
-fileApi = FileApi('http://localhost:8000')
-taskApi = TaskApi('http://localhost:8000')
-
+fileApi = FileApi('http://192.168.0.209:7394')
+taskApi = TaskApi('192.168.0.209', 1883, 'admin', 'mx123456', f'hir-alg-mqtt-{random.randint(0, 1000)}')
+taskApi.connect_mqtt()
 
 # return code:
 # 'invalid': parameter invalid
@@ -31,23 +32,36 @@ def infer_task(a):
 
             fid, task_id = a.target
             # # TODO: 执行下载文件操作并存储在临时文件中
-            # fileApi.download(file_id=fid, 'tmp_file.jpg')
+            # demo task execution
+            if fid == 'data_test' and task_id == 'infer_demo':
+                fid = 'a0382a321bf9447ea99c6cb7a7f836da.jpg'
+
+            fileApi.download(file_name=fid, saved_file_path='img_tmp.jpg')
             img = Image.open("tmp_file.jpg")
             result = infer.infer(img)
 
-            time.sleep(10)
+            time.sleep(1)
 
             # generate result file
             output_file_name = 'output_{}'.format(task_id)
             with open(output_file_name+'.dat', 'w') as f:
                 np.savetxt(f, result)
-            zf = zipfile.ZipFile(output_file_name+'.zip', 'w')
-            zf.write(output_file_name+'.dat', output_file_name+'.dat', zipfile.ZIP_DEFLATED)
-            zf.close()
-            os.remove(output_file_name+'.dat')
+                f.close()
+            # zf = zipfile.ZipFile(output_file_name+'.zip', 'w')
+            # zf.write(output_file_name+'.dat', output_file_name+'.dat', zipfile.ZIP_DEFLATED)
+            # zf.close()
+            # os.remove(output_file_name+'.dat')
+            response = fileApi.upload(output_file_name+'.dat')
+            output_file_name = response['msg']['data']['new_name']
+            taskApi.update_task(task_id, {
+                'status': 'done',
+                'output_file_name': output_file_name,
+                'result': {
+                    'num': 10
+                }
+            })
 
-            # TODO: 上传结果文件，获取文件id
-            # result = fileApi.upload(output_file_name+'.zip')
+
             # result = {
             #     'code': 1,
             # }
@@ -166,10 +180,31 @@ def request_infer():
             'code': 'sbumitted'
         }
 
+@app.route('/api/status', methods=['GET'])
+def status():
+    return {
+        'code': 'ok',
+        'status': alg.pending,
+    }
+
+@app.route('/api/infer/demo', methods=['POST'])
+def infer_demo():
+    res = alg.submit('data_test', 'infer_demo')
+    if res == -1:
+        return {
+            'task_id': 'infer_demo',
+            'code': 'busy',
+        }
+    else:
+        return {
+            'task_id': 'infer_demo',
+            'code': 'submitted',
+        }
+
 
 """算法结果样例访问接口"""
-@app.route('/api/infer/demo', methods=['GET'])
-def test_infer():
+@app.route('/api/infer/result/demo', methods=['GET'])
+def infer_result_demo():
     return {
         'task_id': 'task_id',
         'file_id': 'file_id',
@@ -180,7 +215,7 @@ def test_infer():
         'status': 'done',
         'result': {
             'count': 700,
-            'output_fid': 'output_fid'
+            'output_file_name': 'output_file_name'
         }
     }
 
