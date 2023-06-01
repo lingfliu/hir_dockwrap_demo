@@ -1,5 +1,6 @@
 import threading
 import time
+import datetime
 
 from flask import Flask, request
 from infer import Inference
@@ -10,19 +11,29 @@ import numpy as np
 import zipfile
 import os
 import random
+from config import Config
+
 
 app = Flask(__name__)
 
-fileApi = FileApi('http://192.168.0.209:7394')
-taskApi = TaskApi('192.168.0.209', 1883, 'admin', 'mx123456', f'hir-alg-mqtt-{random.randint(0, 1000)}')
-taskApi.connect_mqtt()
+fileApi = FileApi(Config['file_server'])
+taskApi = TaskApi(Config['mqtt_host'],
+                  Config['mqtt_port'],
+                  Config['mqtt_username'],
+                  Config['mqtt_password'])
 
-# return code:
+# infer return code:
 # 'invalid': parameter invalid
 # 'busy': alg is running
 # 'submitted': alg submitted
 # 'failed': alg failed
 # 'done': alg done
+
+TASK_STATUS_INVALID = 'invalid'
+TASK_STATUS_BUSY = 'busy'
+TASK_STATUS_SUBMITTED = 'submitted'
+TASK_STATUS_DONE = 'done'
+TASK_STATUS_INVALID = 'invalid'
 
 infer = Inference()
 def infer_task(a):
@@ -30,8 +41,7 @@ def infer_task(a):
         time.sleep(0.1)
         if alg.pending:
 
-            fid, task_id = a.target
-            # # TODO: 执行下载文件操作并存储在临时文件中
+            fid, task_id, task_type = a.target
             # demo task execution
             if fid == 'data_test' and task_id == 'infer_demo':
                 fid = 'a0382a321bf9447ea99c6cb7a7f836da.jpg'
@@ -41,6 +51,9 @@ def infer_task(a):
             result = infer.infer(img)
 
             time.sleep(1)
+
+            # format time as yyyy-mm-dd hh:mm:ss
+            finish_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
             # generate result file
             output_file_name = 'output_{}'.format(task_id)
@@ -54,13 +67,16 @@ def infer_task(a):
             # zf.close()
             # os.remove(output_file_name+'.dat')
             response = fileApi.upload(output_file_name+'.dat')
-            output_file_name = response['msg']['data']['new_name']
-            taskApi.update_task(task_id, 'done', {
-                'output_file_name': output_file_name,
-                'result': {
-                    'num': 10
-                }
-            })
+            result_file_name = response['msg']['data']['new_name']
+            taskApi.update_task(task_id,
+                                task_type,
+                                TASK_STATUS_DONE,
+                                finish_time,
+                                result_file_name,
+                                { # result params
+                                    'num': 10
+                                }
+                                )
 
             # 清空任务
             a.target = ()
@@ -79,13 +95,13 @@ class Alg:
         self.pending = False
         self.pool.submit(self.infer_task, self)
 
-    def submit(self, file_url, task_id):
+    def submit(self, data_file_name, task_id, task_type):
         ret = 0
         if self.pending:
             # 如果当前有算法任务在执行，丢弃该次请求，返回-1
             ret = -1
         else:
-            self.target = (file_url, task_id)
+            self.target = (data_file_name, task_id, task_type)
             # 这里可能有同步问题，尽量不要采用高并发的模式
             self.pending = True
             ret = 0
@@ -97,7 +113,6 @@ class Alg:
         self.pool.shutdown(wait=False)
 
 alg = Alg()
-
 
 alg_type = 'alg_type'
 """
@@ -119,14 +134,14 @@ def about():
 @app.route('/api/infer', methods=['POST'])
 def request_infer():
     print('infer request at ', time.time())
-    file_id = request.json.get('file_id')
     task_id = request.json.get('task_id')
+    task_type = request.json.get('task_type')
+    data_file_name = request.json.get('data_file_name')
     data_time = request.json.get('data_time')
     data_coord = request.json.get('data_coord')
-    task_type = request.json.get('task_type')
 
     # data validation
-    if not (file_id and task_id and data_time and data_coord):
+    if not (data_file_name and task_id and data_time and data_coord):
         return {
             'task_id': task_id,
             'code': 'invalid',
@@ -139,7 +154,7 @@ def request_infer():
         }
 
     # submit task
-    ret = alg.submit(file_id, task_id)
+    ret = alg.submit(data_file_name, task_id, task_type)
     print('infer request result', ret, ' at ', time.time())
 
     if ret == -1:
