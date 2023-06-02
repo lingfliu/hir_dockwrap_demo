@@ -178,7 +178,7 @@ def status():
 
 @app.route('/api/infer/demo', methods=['POST'])
 def infer_demo():
-    res = alg.submit('data_test', 'infer_demo')
+    res = alg.submit('data_test', 'infer_demo', alg_type)
     if res == -1:
         return {
             'task_id': 'infer_demo',
